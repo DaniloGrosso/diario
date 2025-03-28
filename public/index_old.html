@@ -1,0 +1,28 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Diário com IA</title>
+</head>
+<body>
+  <h1>Como foi seu dia?</h1>
+  <textarea id="entrada" rows="6" cols="50"></textarea><br>
+  <button onclick="enviar()">Enviar</button>
+  <h2>Resposta da IA:</h2>
+  <p id="resposta"></p>
+
+  <script>
+    async function enviar() {
+      const entrada = document.getElementById('entrada').value;
+      const res = await fetch('/diario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entrada })
+      });
+      const data = await res.json();
+      document.getElementById('resposta').innerText = data.resposta;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📔 Como foi seu dia?</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans min-h-screen py-10 px-4">
+  <div class="bg-white shadow-xl rounded-2xl max-w-4xl mx-auto w-full p-8 space-y-6 border border-gray-200">
+
+    <!-- Seção de login -->
+    <div id="authSection">
+      <h2 class="text-xl font-bold text-center mb-4">🔐 Login</h2>
+      <form id="loginForm" class="space-y-4">
+        <input type="email" name="email" required placeholder="Email" class="w-full p-3 border rounded-lg" />
+        <input type="password" name="password" required placeholder="Senha" class="w-full p-3 border rounded-lg" />
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">Entrar</button>
+      </form>
+      <div class="text-center mt-4">
+        <button id="signupBtn" class="text-sm text-blue-600 hover:underline">Criar nova conta</button>
+      </div>
+    </div>
+
+    <!-- Conteúdo principal -->
+    <div id="mainContent" style="display:none;">
+      <div class="text-right text-sm text-gray-600 mb-2">
+        Logado como: <span id="userEmailDisplay"></span>
+        <button id="logoutBtn" class="ml-4 text-blue-600 hover:underline">Sair</button>
+      </div>
+
+      <h1 class="text-3xl font-bold text-center">📝 Como foi seu dia?</h1>
+
+      <textarea id="entrada" rows="5"
+        class="w-full p-4 border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 mt-4"
+        placeholder="Escreva aqui..."></textarea>
+
+      <div class="w-full text-center">
+        <button onclick="enviarEntrada()"
+          class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-lg py-3 px-8 rounded-xl shadow transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 mt-4">
+          Enviar
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200 min-h-[200px]" id="respostaIA" style="display: none;">
+          <h2 class="text-lg font-semibold mb-2">💡 Resposta da IA:</h2>
+          <p id="respostaTexto" class="text-gray-700 whitespace-pre-line"></p>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+          <h2 class="text-lg font-semibold mb-2">📊 Estatísticas</h2>
+          <p><strong>Total de entradas:</strong> <span id="totalEntradas">0</span></p>
+          <p><strong>Dias com registros:</strong> <span id="diasRegistrados">0</span></p>
+          <p><strong>Média por dia:</strong> <span id="mediaPorDia">0</span></p>
+        </div>
+      </div>
+
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mt-6">
+        <h2 class="text-lg font-semibold mb-4">📚 Histórico</h2>
+        <div id="historicoContainer" class="space-y-4 text-sm text-gray-700"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      onAuthStateChanged,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAF7zs6hGAx3sDwy2Dgt0rJ7KFQOhOoqls",
+      authDomain: "diario-ia.firebaseapp.com",
+      projectId: "diario-ia",
+      storageBucket: "diario-ia.appspot.com",
+      messagingSenderId: "25566661290",
+      appId: "1:25566661290:web:c1a762e076a22ff3041ed3"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    const authSection = document.getElementById("authSection");
+    const mainContent = document.getElementById("mainContent");
+    const userEmailDisplay = document.getElementById("userEmailDisplay");
+
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = e.target.email.value;
+      const password = e.target.password.value;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (err) {
+        alert("Erro ao logar: " + err.message);
+      }
+    });
+
+    document.getElementById("signupBtn").addEventListener("click", async () => {
+      const email = prompt("Digite seu email:");
+      const password = prompt("Digite sua senha (mínimo 6 caracteres):");
+      if (!email || !password) return;
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+        alert("Conta criada com sucesso!");
+      } catch (err) {
+        alert("Erro ao criar conta: " + err.message);
+      }
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      await signOut(auth);
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        authSection.style.display = "none";
+        mainContent.style.display = "block";
+        userEmailDisplay.textContent = user.email;
+        buscarHistorico(user.email);
+        carregarEstatisticas(user.email);
+      } else {
+        authSection.style.display = "block";
+        mainContent.style.display = "none";
+
+        document.getElementById("respostaIA").style.display = "none";
+        document.getElementById("respostaTexto").innerText = "";
+        document.getElementById("historicoContainer").innerHTML = "";
+        document.getElementById("totalEntradas").textContent = "0";
+        document.getElementById("diasRegistrados").textContent = "0";
+        document.getElementById("mediaPorDia").textContent = "0";
+      }
+    });
+
+    async function gerarResumoContexto(email, limite = 5) {
+      try {
+        const res = await fetch(`/historico?email=${encodeURIComponent(email)}`);
+        const data = await res.json();
+
+        const ultimos = data.slice(-limite);
+        const contexto = ultimos.map(item => {
+          const dataFormatada = item.data?.seconds
+            ? new Date(item.data.seconds * 1000).toLocaleDateString('pt-BR')
+            : 'dia indefinido';
+          return `No dia ${dataFormatada}, o usuário disse: \"${item.entrada}\". A IA respondeu: \"${item.resposta}\".`;
+        }).join(" ");
+
+        return contexto;
+
+      } catch (e) {
+        console.error("Erro ao gerar contexto:", e);
+        return "";
+      }
+    }
+
+    window.enviarEntrada = async function () {
+      const entrada = document.getElementById("entrada").value;
+      const user = auth.currentUser;
+      if (!entrada.trim() || !user) return;
+
+      const respostaDiv = document.getElementById("respostaIA");
+      const respostaTexto = document.getElementById("respostaTexto");
+      respostaTexto.innerText = "... pensando ...";
+      respostaDiv.style.display = "block";
+
+      try {
+        const contexto = await gerarResumoContexto(user.email);
+
+        const response = await fetch("/diario", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entrada, email: user.email, contexto })
+        });
+
+        const data = await response.json();
+        respostaTexto.innerText = data.resposta;
+        document.getElementById("entrada").value = "";
+        buscarHistorico(user.email);
+        carregarEstatisticas(user.email);
+      } catch (err) {
+        respostaTexto.innerText = "Erro ao buscar resposta da IA.";
+      }
+    };
+
+    window.carregarEstatisticas = async function (email) {
+      try {
+        const res = await fetch(`/estatisticas?email=${encodeURIComponent(email)}`);
+        const data = await res.json();
+
+        document.getElementById("totalEntradas").textContent = data.totalEntradas;
+        document.getElementById("diasRegistrados").textContent = data.totalDias;
+        document.getElementById("mediaPorDia").textContent = data.mediaPorDia;
+
+      } catch (err) {
+        console.error("Erro ao carregar estatísticas:", err);
+      }
+    }
+
+    window.buscarHistorico = async function (email) {
+      try {
+        const res = await fetch(`/historico?email=${encodeURIComponent(email)}`);
+        const data = await res.json();
+        const container = document.getElementById("historicoContainer");
+        container.innerHTML = "";
+
+        data.forEach(item => {
+          const dataFormatada = item.data?.seconds
+            ? new Date(item.data.seconds * 1000).toLocaleString('pt-BR')
+            : 'Data não disponível';
+
+          const div = document.createElement("div");
+          div.innerHTML = `
+            <div class="text-xs text-gray-500">${dataFormatada}</div>
+            <div><strong>Você:</strong> ${item.entrada}</div>
+            <div><strong>IA:</strong> ${item.resposta}</div>
+            <hr class="mt-2" />
+          `;
+          container.appendChild(div);
+        });
+      } catch (e) {
+        console.error("Erro ao buscar histórico:", e);
+      }
+    }
+  </script>
+</body>
+</html>
